@@ -1,0 +1,36 @@
+# Copyright 2021 Przemysław Lal
+# See LICENSE file for licensing details.
+name: jaeger
+description: |
+  Charm to operate Jaeger
+summary: |
+  Charm to operate Jaeger
+
+containers:
+  agent:
+    resource: agent-image
+  collector:
+    resource: collector-image
+  query:
+    resource: query-image
+
+requires:
+  datastore:
+    interface: elasticsearch-datastore
+    limit: 1
+
+provides:
+  opentracing:
+    interface: tracing-agent
+    optional: true
+
+resources:
+  agent-image:
+    type: oci-image
+    description: jaeger-agent OCI image
+  collector-image:
+    type: oci-image
+    description: jaeger-collector OCI image
+  query-image:
+    type: oci-image
+    description: jaeger-query OCI image
