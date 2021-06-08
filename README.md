@@ -1,4 +1,4 @@
-# Jaeger charm for Kubernetes
+# Jaeger Charm for Kubernetes
 
 ## Description
 
