@@ -44,8 +44,8 @@ class JaegerCharm(CharmBase):
         self.framework.observe(self.on["datastore"].relation_changed,
                                self._on_datastore_relation_changed)
 
-        self.framework.observe(self.on["opentracing"].relation_changed,
-                               self._on_opentracing_relation_changed)
+        self.framework.observe(self.on["jaeger"].relation_changed,
+                               self._on_jaeger_relation_changed)
 
         self._stored.set_default(es_server_url=str())
 
@@ -162,9 +162,9 @@ class JaegerCharm(CharmBase):
 
         self.unit.status = ActiveStatus()
 
-    def _on_opentracing_relation_changed(self, event):
+    def _on_jaeger_relation_changed(self, event):
         if self.unit.is_leader():
-            event.relation.data[self.unit]['agent-address'] = str(self.model.get_binding("opentracing").network.bind_address)
+            event.relation.data[self.unit]['agent-address'] = str(self.model.get_binding("jaeger").network.bind_address)
             event.relation.data[self.unit]['port'] = str(self.model.config['agent-port'])
 
 

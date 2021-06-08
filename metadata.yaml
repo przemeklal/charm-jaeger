@@ -20,8 +20,8 @@ requires:
     limit: 1
 
 provides:
-  opentracing:
-    interface: tracing-agent
+  jaeger:
+    interface: distributed-tracing
     optional: true
 
 resources:
