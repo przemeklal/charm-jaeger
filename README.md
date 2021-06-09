@@ -49,7 +49,7 @@ juju add-relation jaeger jaeger-hotrod
 
 | Name | Parameters | Description |
 | --- | --- | --- |
-| restart | service=`<service_name>` | Restarts selected Jaeger service. <`service_name`><br>Service name should be one of: `agent`, `collector`, `query` |
+| restart | service=`<service_name>` | Restarts selected Jaeger service.<br>Service name should be one of: `agent`, `collector`, `query` |
 
 ## Developing
 
