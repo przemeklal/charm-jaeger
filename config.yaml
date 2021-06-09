@@ -10,10 +10,14 @@
 options:
   span-storage-type:
     default: elasticsearch
-    description: Storage backend.
+    description: |
+      Storage backend.
+      Supported options:
+        - elasticsearch
     type: string
   agent-port:
     default: 6831
-    description: Jaeger agent port.
+    description: |
+      Jaeger agent port.
+      Port to listen on jaeger.thrift over compact thrift protocol.
     type: int
-

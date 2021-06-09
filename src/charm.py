@@ -17,7 +17,7 @@ import logging
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
+from ops.model import ActiveStatus, MaintenanceStatus, ModelError, Relation, WaitingStatus
 
 logger = logging.getLogger(__name__)
 
@@ -35,19 +35,38 @@ class JaegerCharm(CharmBase):
 
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
-        self.framework.observe(self.on["datastore"].relation_joined,
-                               self._update_datastore_relation)
         self.framework.observe(self.on["datastore"].relation_changed,
                                self._update_datastore_relation)
         self.framework.observe(self.on["datastore"].relation_broken,
-                               self._clear_datastore_relation)
-        self.framework.observe(self.on["datastore"].relation_departed,
-                               self._clear_datastore_relation)
+                               self._update_datastore_relation)
 
         self.framework.observe(self.on["jaeger"].relation_joined, self._update_jaeger_relation)
         self.framework.observe(self.on["jaeger"].relation_changed, self._update_jaeger_relation)
 
-        self._stored.set_default(es_server_url=str())
+        self.framework.observe(self.on.restart_action, self._on_restart_action)
+
+    @property
+    def datastore_relation(self) -> Relation:
+        # only one relation to datastore is needed/supported
+        for datastore_relation in self.framework.model.relations["datastore"]:
+            return datastore_relation
+
+    @property
+    def datastore_provider_unit(self) -> Relation:
+        # only one relation to datastore is needed/supported
+        for datastore_provider in self.datastore_relation.units:
+            return datastore_provider
+
+    @property
+    def datastore_endpoint(self) -> str:
+        try:
+            rel_data = self.datastore_relation.data[self.datastore_provider_unit]
+            hostname = rel_data.get("ingress-address")
+            port = str(rel_data.get("port"))
+            return "http://{}:{}".format(hostname, port)
+        except (AttributeError, KeyError):
+            logger.debug("no datastore endpoint present")
+            return None
 
     def _on_agent_pebble_ready(self, event):
         self._update_agent_and_run()
@@ -78,7 +97,7 @@ class JaegerCharm(CharmBase):
             container.stop("agent")
         container.start("agent")
 
-        self.unit.status = ActiveStatus("Jaeger agent ready to use")
+        self.unit.status = ActiveStatus("Jaeger agent started")
 
     def _update_collector_and_run(self):
         self.unit.status = MaintenanceStatus('Configuring jaeger-collector')
@@ -94,7 +113,7 @@ class JaegerCharm(CharmBase):
                     "startup": "enabled",
                     "environment": {
                         "SPAN_STORAGE_TYPE": self.model.config["span-storage-type"],
-                        "ES_SERVER_URLS": self._stored.es_server_url,
+                        "ES_SERVER_URLS": self.datastore_endpoint,
                     },
                 }
             },
@@ -107,7 +126,10 @@ class JaegerCharm(CharmBase):
             container.stop("collector")
         container.start("collector")
 
-        self.unit.status = ActiveStatus("Jaeger collector ready to use")
+        if not self.datastore_endpoint:
+            self.unit.status = WaitingStatus("Datastore endpoint missing, check relations")
+        else:
+            self.unit.status = ActiveStatus("jaeger-collector started")
 
     def _update_query_service_and_run(self):
         self.unit.status = MaintenanceStatus('Configuring jaeger-query')
@@ -123,7 +145,7 @@ class JaegerCharm(CharmBase):
                     "startup": "enabled",
                     "environment": {
                         "SPAN_STORAGE_TYPE": self.model.config["span-storage-type"],
-                        "ES_SERVER_URLS": self._stored.es_server_url,
+                        "ES_SERVER_URLS": self.datastore_endpoint,
                     },
                 }
             },
@@ -136,71 +158,61 @@ class JaegerCharm(CharmBase):
             container.stop("query")
         container.start("query")
 
-        self.unit.status = ActiveStatus("Jaeger ready to use")
+        if not self.datastore_endpoint:
+            self.unit.status = WaitingStatus("Datastore endpoint missing, check relations")
+        else:
+            self.unit.status = ActiveStatus("jaeger-query started")
 
     def _on_collector_pebble_ready(self, event):
-        if self._es_datastore_present():
-            self._update_collector_and_run()
+        self._update_collector_and_run()
 
     def _on_query_pebble_ready(self, event):
-        if self._es_datastore_present():
-            self._update_query_service_and_run()
+        self._update_query_service_and_run()
 
     def _on_config_changed(self, _):
         self.unit.status = MaintenanceStatus('Updating configuration')
-        if self._es_datastore_present():
-            self._update_collector_and_run()
-            self._update_query_service_and_run()
+
+        # update config and restart everything
+        self._update_collector_and_run()
+        self._update_query_service_and_run()
         self._update_agent_and_run()
-        self.unit.status = ActiveStatus('Jaeger ready to use')
+
+        self.unit.status = ActiveStatus('Jaeger services started')
 
     def _update_datastore_relation(self, event):
         self.unit.status = MaintenanceStatus(
-            "Updating datastore relation"
+            "Updating datastore endpoint"
         )
 
-        relation_data = event.relation.data[event.unit]
-        es_hostname = relation_data.get("ingress-address")
-        es_port = relation_data.get("port")
-
-        if not es_hostname or not es_port:
-            self.unit.status = BlockedStatus(
-                "Datastore hostname or port missing in the relation data"
-            )
-            return
-
-        self._stored.es_server_url = "http://{}:{}".format(es_hostname, es_port)
-
-        logger.debug("ES endpoint details received: %s", self._stored.es_server_url)
-
-        # restart collector and query
-        self._update_collector_and_run()
-        self._update_query_service_and_run()
-
-    def _clear_datastore_relation(self, event):
-        self.unit.status = MaintenanceStatus(
-            "Clearing datastore relation"
-        )
-
-        self._stored.es_server_url = str()
-
-        # restart collector and query
         self._update_collector_and_run()
         self._update_query_service_and_run()
 
     def _update_jaeger_relation(self, event):
         if self.unit.is_leader():
             event.relation.data[self.unit]['agent-address'] = \
-                str(self.model.get_binding("jaeger").network.bind_address)
+                str(self.model.get_binding("jaeger").network.ingress_address)
             event.relation.data[self.unit]['port'] = str(self.model.config['agent-port'])
 
-    def _es_datastore_present(self):
-        if not self._stored.es_server_url:
-            self.unit.status = BlockedStatus(
-                "datastore endpoint missing, check for missing relation with elasticsearch-k8s"
-            )
-            return False
-        return True
+    def _on_restart_action(self, event):
+        name = event.params["service"]
+        event.log("Restarting service {}".format(name))
+        # note: containers and services use the same names, so it's safe to do that
+        try:
+            self._restart_container_service(name, name)
+        except ModelError as e:
+            event.fail(message=str(e))
+
+    # workaround for https://github.com/canonical/operator/issues/491
+    def _restart_container_service(self, container_name, svc_name):
+        container = self.unit.get_container(container_name)
+        if not container:
+            msg = "Container {} not found".format(container_name)
+            logger.error(msg)
+            return
+
+        if container.get_service(svc_name).is_running():
+            container.stop(svc_name)
+        container.start(svc_name)
 
 
 if __name__ == "__main__":
