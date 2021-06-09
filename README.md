@@ -44,6 +44,7 @@ juju add-relation jaeger jaeger-hotrod
 | --- | --- | --- | --- |
 | span-storage-type | string | Storage backend solution | `elasticsearch` | 
 | agent-port | int | Jaeger agent port. Port to listen on jaeger.thrift over compact thrift protocol. | `6831` | 
+| agent-port-binary | int | Jaeger agent port. Port to listen on jaeger.thrift over binary thrift protocol used by NodeJS clients. | `6832` | 
 
 ### Actions
 

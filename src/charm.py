@@ -83,7 +83,9 @@ class JaegerCharm(CharmBase):
                     "summary": "jaeger-agent",
                     "command": "/go/bin/agent-linux --reporter.grpc.host-port=127.0.0.1:14250"
                                " --processor.jaeger-compact.server-host-port={}"
-                               .format(str(self.model.config['agent-port'])),
+                               " --processor.jaeger-binary.server-host-port={}"
+                               .format(str(self.model.config['agent-port']),
+                                       str(self.model.config['agent-port-binary'])),
                     "startup": "enabled",
                     "environment": {},
                 }
@@ -190,8 +192,9 @@ class JaegerCharm(CharmBase):
     def _update_jaeger_relation(self, event):
         if self.unit.is_leader():
             event.relation.data[self.unit]['agent-address'] = \
-                str(self.model.get_binding("jaeger").network.ingress_address)
+                str(self.model.get_binding("jaeger").network.bind_address)
             event.relation.data[self.unit]['port'] = str(self.model.config['agent-port'])
+            event.relation.data[self.unit]['port_binary'] = str(self.model.config['agent-port-binary'])
 
     def _on_restart_action(self, event):
         name = event.params["service"]

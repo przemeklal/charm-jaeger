@@ -12,6 +12,10 @@ options:
   agent-port:
     default: 6831
     description: |
-      Jaeger agent port.
-      Port to listen on jaeger.thrift over compact thrift protocol.
+      Port that the agent will use to listen on jaeger.thrift over compact Thrift protocol.
+    type: int
+  agent-port-binary:
+    default: 6832
+    description: |
+      Port that the agent will use to listen on jaeger.thrift over binary Thrift protocol.
     type: int
