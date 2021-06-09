@@ -40,17 +40,17 @@ juju add-relation jaeger jaeger-hotrod
 
 ### Configuration options
 
-```
-  span-storage-type:
-    default: elasticsearch
-    description: Storage backend.
-    type: string
-  agent-port:
-    default: 6831
-    description: Jaeger agent port (used to listen for jaeger.thrift in compact Thrift protocol used by most current Jaeger clients).
-    type: int
-```
->Note: `elasticsearch` is the only supported datastore at the moment.
+| Name | Type | Description | Default value |
+| --- | --- | --- | --- |
+| span-storage-type | string | Storage backend solution | `elasticsearch` | 
+| agent-port | int | Jaeger agent port. Port to listen on jaeger.thrift over compact thrift protocol. | `6831` | 
+
+### Actions
+
+| Name | Parameters | Description |
+| --- | --- | --- |
+| restart | service=`<service_name>` | Restarts selected Jaeger service. <`service_name`><br>Service name should be one of: `agent`, `collector`, `query` |
+
 ## Developing
 
 Create and activate a virtualenv with the development requirements:
