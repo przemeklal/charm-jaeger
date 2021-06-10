@@ -19,14 +19,15 @@ juju deploy elasticsearch-k8s
 Build and deploy the charm:
 ```
 charmcraft pack
-juju deploy ./jaeger.charm --resource agent-image=jaegertracing/jaeger-agent:1.22 \
-                           --resource collector-image=jaegertracing/jaeger-collector:1.22 \
-                           --resource query-image=jaegertracing/jaeger-query:1.22
+juju deploy ./jaeger-k8s.charm \
+    --resource agent-image=jaegertracing/jaeger-agent:1.22 \
+    --resource collector-image=jaegertracing/jaeger-collector:1.22 \
+    --resource query-image=jaegertracing/jaeger-query:1.22
 ```
 
-Add relation between `jaeger` and `elasticsearch-k8s`:
+Add relation between `jaeger-k8s` and `elasticsearch-k8s`:
 ```
-juju add-relation jaeger elasticsearch-k8s
+juju add-relation jaeger-k8s elasticsearch-k8s
 ```
 
 Relate with a Jaeger client application of your choice. Example charms that support relation with this charm include:
@@ -35,7 +36,7 @@ Relate with a Jaeger client application of your choice. Example charms that supp
 
 Example:
 ```
-juju add-relation jaeger jaeger-hotrod
+juju add-relation jaeger-k8s jaeger-hotrod
 ```
 
 ### Configuration options

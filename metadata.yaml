@@ -1,10 +1,10 @@
 # Copyright 2021 Przemysław Lal
 # See LICENSE file for licensing details.
-name: jaeger
+name: jaeger-k8s
 description: |
-  Charm to operate Jaeger
+  Charm to deploy and operate Jaeger.
 summary: |
-  Charm to operate Jaeger
+  Charm to operate and operate Jaeger.
 
 containers:
   agent:
@@ -20,8 +20,8 @@ requires:
     limit: 1
 
 provides:
-  jaeger:
-    interface: distributed-tracing
+  distributed-tracing:
+    interface: jaeger-ingestion
     optional: true
 
 resources:
