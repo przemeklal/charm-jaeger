@@ -17,7 +17,7 @@ import logging
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, MaintenanceStatus, ModelError, Relation, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, ModelError, Relation
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,10 @@ class JaegerCharm(CharmBase):
         self.framework.observe(self.on["datastore"].relation_broken,
                                self._update_datastore_relation)
 
-        self.framework.observe(self.on["jaeger"].relation_joined, self._update_jaeger_relation)
-        self.framework.observe(self.on["jaeger"].relation_changed, self._update_jaeger_relation)
+        self.framework.observe(self.on["distributed-tracing"].relation_joined,
+                               self._update_distributed_tracing_relation)
+        self.framework.observe(self.on["distributed-tracing"].relation_changed,
+                               self._update_distributed_tracing_relation)
 
         self.framework.observe(self.on.restart_action, self._on_restart_action)
 
@@ -99,7 +101,7 @@ class JaegerCharm(CharmBase):
             container.stop("agent")
         container.start("agent")
 
-        self.unit.status = ActiveStatus("Jaeger agent started")
+        self.unit.status = ActiveStatus()
 
     def _update_collector_and_run(self):
         self.unit.status = MaintenanceStatus('Configuring jaeger-collector')
@@ -129,9 +131,9 @@ class JaegerCharm(CharmBase):
         container.start("collector")
 
         if not self.datastore_endpoint:
-            self.unit.status = WaitingStatus("Datastore endpoint missing, check relations")
+            self.unit.status = BlockedStatus("Datastore endpoint missing, check relations")
         else:
-            self.unit.status = ActiveStatus("jaeger-collector started")
+            self.unit.status = ActiveStatus()
 
     def _update_query_service_and_run(self):
         self.unit.status = MaintenanceStatus('Configuring jaeger-query')
@@ -161,9 +163,9 @@ class JaegerCharm(CharmBase):
         container.start("query")
 
         if not self.datastore_endpoint:
-            self.unit.status = WaitingStatus("Datastore endpoint missing, check relations")
+            self.unit.status = BlockedStatus("Datastore endpoint missing, check relations")
         else:
-            self.unit.status = ActiveStatus("jaeger-query started")
+            self.unit.status = ActiveStatus()
 
     def _on_collector_pebble_ready(self, event):
         self._update_collector_and_run()
@@ -179,7 +181,7 @@ class JaegerCharm(CharmBase):
         self._update_query_service_and_run()
         self._update_agent_and_run()
 
-        self.unit.status = ActiveStatus('Jaeger services started')
+        self.unit.status = ActiveStatus()
 
     def _update_datastore_relation(self, event):
         self.unit.status = MaintenanceStatus(
@@ -189,12 +191,13 @@ class JaegerCharm(CharmBase):
         self._update_collector_and_run()
         self._update_query_service_and_run()
 
-    def _update_jaeger_relation(self, event):
+    def _update_distributed_tracing_relation(self, event):
         if self.unit.is_leader():
             event.relation.data[self.unit]['agent-address'] = \
                 str(self.model.get_binding("jaeger").network.bind_address)
             event.relation.data[self.unit]['port'] = str(self.model.config['agent-port'])
-            event.relation.data[self.unit]['port_binary'] = str(self.model.config['agent-port-binary'])
+            event.relation.data[self.unit]['port_binary'] = \
+                str(self.model.config['agent-port-binary'])
 
     def _on_restart_action(self, event):
         name = event.params["service"]
