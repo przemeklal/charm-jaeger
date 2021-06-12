@@ -13,6 +13,7 @@ develop a new k8s charm using the Operator Framework:
 """
 
 import logging
+import socket
 
 from ops.charm import CharmBase
 from ops.framework import StoredState
@@ -191,13 +192,30 @@ class JaegerCharm(CharmBase):
         self._update_collector_and_run()
         self._update_query_service_and_run()
 
+    def _get_app_fqdn(self, relation):
+        try:
+            pod_addr = self.model.get_binding(relation).network.bind_address
+            addr = socket.getnameinfo((str(pod_addr), 0), socket.NI_NAMEREQD)[0]
+            return addr
+        except Exception:
+            return
+
     def _update_distributed_tracing_relation(self, event):
         if self.unit.is_leader():
-            event.relation.data[self.unit]['agent-address'] = \
-                str(self.model.get_binding("jaeger").network.bind_address)
-            event.relation.data[self.unit]['port'] = str(self.model.config['agent-port'])
-            event.relation.data[self.unit]['port_binary'] = \
+            address = self._get_app_fqdn(event.relation)
+            if not address:
+                address = self.model.get_binding(event.relation).network.ingress_address
+            if not address:
+                address = self.model.get_binding(event.relation).network.bind_address
+
+            event.relation.data[self.app]['agent-address'] = str(address)
+
+            event.relation.data[self.app]['port'] = \
+                str(self.model.config['agent-port'])
+            event.relation.data[self.app]['port_binary'] = \
                 str(self.model.config['agent-port-binary'])
+
+            logger.debug("Published relation data: %s", str(event.relation.data))
 
     def _on_restart_action(self, event):
         name = event.params["service"]
